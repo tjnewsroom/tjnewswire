@@ -1,0 +1,902 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0">
+<title>TJ Wire — Groq Newsroom Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=Source+Serif+4:ital,wght@0,400;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* ---- console (dark, operator side) ---- */
+  --navy-950:#0A1120;
+  --navy-900:#0F1830;
+  --navy-800:#16213C;
+  --navy-700:#1F2E4D;
+  --hairline:#2B3A5C;
+  --ink-soft:#9FB0D0;
+  --white:#F4F7FC;
+
+  /* ---- paper (light, copy well) ---- */
+  --paper:#FAF6EC;
+  --paper-raised:#FFFFFF;
+  --paper-ink:#1B1710;
+  --paper-dim:#7A7264;
+  --paper-line:#E4DCC8;
+
+  /* ---- signal colors ---- */
+  --wire-cyan:#1FB6C9;
+  --tally-red:#D62839;
+  --tally-red-h:#B81F2F;
+  --flag-amber:#C97A15;
+  --flag-amber-bg:#FCEDD2;
+  --mint:#1F8F5F;
+  --mint-bg:#E4F5EC;
+
+  --mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Consolas,monospace;
+  --display:'Big Shoulders Display',ui-sans-serif,sans-serif;
+  --serif:'Source Serif 4',Georgia,'Noto Serif Tamil',serif;
+  --tamil-ui:'Nirmala UI','Noto Sans Tamil',sans-serif;
+
+  --r-sm:6px; --r-md:10px; --r-lg:14px;
+}
+
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  background:var(--navy-950);
+  color:var(--white);
+  font-family:var(--tamil-ui),-apple-system,'Segoe UI',sans-serif;
+  font-size:14px;
+  line-height:1.5;
+  -webkit-tap-highlight-color:transparent;
+}
+img{max-width:100%;display:block}
+input,select,textarea,button{font-family:inherit;font-size:16px}
+::selection{background:rgba(31,182,201,.28)}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+/* ================= TOPBAR ================= */
+.topbar{
+  display:flex;align-items:center;gap:14px;
+  padding:14px 20px;
+  border-bottom:1px solid var(--hairline);
+  background:linear-gradient(180deg,var(--navy-900),var(--navy-950));
+  position:sticky;top:0;z-index:40;
+}
+.brand{display:flex;align-items:center;gap:10px;min-width:0}
+.brand .lamp{width:10px;height:10px;border-radius:50%;background:var(--tally-red);
+  box-shadow:0 0 0 3px rgba(214,40,57,.18),0 0 10px rgba(214,40,57,.55);
+  animation:lamp-pulse 2.2s ease-in-out infinite;flex-shrink:0}
+@keyframes lamp-pulse{0%,100%{opacity:1}50%{opacity:.35}}
+.brand h1{
+  font-family:var(--display);font-weight:800;font-size:22px;letter-spacing:.5px;
+  margin:0;white-space:nowrap;text-transform:uppercase;
+}
+.brand h1 em{font-style:normal;color:var(--wire-cyan)}
+.brand .tag{
+  font-family:var(--mono);font-size:10px;letter-spacing:1.5px;color:var(--ink-soft);
+  text-transform:uppercase;white-space:nowrap;display:none;
+}
+@media (min-width:640px){.brand .tag{display:block}}
+.topbar .spacer{flex:1}
+.clock{font-family:var(--mono);font-size:11px;color:var(--ink-soft);white-space:nowrap;display:none}
+@media (min-width:560px){.clock{display:block}}
+
+/* ================= LAYOUT ================= */
+.shell{max-width:1440px;margin:0 auto}
+.layout{display:grid;grid-template-columns:1fr;gap:18px;padding:18px}
+@media (min-width:980px){
+  .layout{grid-template-columns:380px 1fr;align-items:start;padding:22px}
+}
+
+/* ================= CONSOLE (dark panel) ================= */
+.console{
+  background:var(--navy-900);
+  border:1px solid var(--hairline);
+  border-radius:var(--r-lg);
+  overflow:hidden;
+}
+@media (min-width:980px){.console{position:sticky;top:78px}}
+
+.c-block{padding:16px 16px 18px;border-bottom:1px solid var(--hairline)}
+.c-block:last-child{border-bottom:none}
+.c-eyebrow{
+  font-family:var(--mono);font-size:10px;letter-spacing:1.6px;color:var(--wire-cyan);
+  text-transform:uppercase;margin:0 0 10px;display:flex;align-items:center;gap:8px;
+}
+.c-eyebrow .num{
+  width:16px;height:16px;border-radius:3px;background:var(--navy-700);
+  display:inline-flex;align-items:center;justify-content:center;
+  font-size:9px;color:var(--white);flex-shrink:0;
+}
+
+label.c-label{display:block;font-size:11px;font-weight:600;color:var(--ink-soft);
+  margin-bottom:5px;letter-spacing:.2px}
+.c-hint{font-size:11px;color:var(--ink-soft);opacity:.75;margin:-4px 0 10px;line-height:1.45}
+
+input[type=text],input[type=password],input[type=number],input[type=file],select,textarea{
+  width:100%;padding:10px 11px;border-radius:var(--r-sm);
+  border:1px solid var(--navy-700);background:var(--navy-950);color:var(--white);
+  margin-bottom:11px;
+}
+input::placeholder,textarea::placeholder{color:#5B6B8C}
+input:focus,select:focus,textarea:focus{
+  outline:2px solid var(--wire-cyan);outline-offset:1px;border-color:var(--wire-cyan);
+}
+textarea{min-height:110px;resize:vertical;font-size:14px}
+select{appearance:none;-webkit-appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%239FB0D0'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:right 12px center;padding-right:30px;
+}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.row > *{flex:1;min-width:0}
+
+.chk{display:flex;align-items:flex-start;gap:9px;margin-bottom:11px;cursor:pointer}
+.chk input{width:17px;height:17px;margin:1px 0 0;flex-shrink:0;accent-color:var(--wire-cyan)}
+.chk .t{font-size:12.5px;color:var(--white);line-height:1.4}
+.chk .t small{display:block;color:var(--ink-soft);font-size:11px;margin-top:1px}
+
+button{cursor:pointer;border:none;border-radius:var(--r-sm);font-weight:700;
+  transition:transform .08s ease, opacity .15s ease;}
+button:active{transform:scale(.98)}
+button:disabled{opacity:.42;cursor:not-allowed;transform:none}
+.btn-primary{
+  width:100%;padding:13px 16px;background:var(--tally-red);color:#fff;
+  font-family:var(--display);font-size:16px;letter-spacing:.4px;text-transform:uppercase;
+}
+.btn-primary:hover:not(:disabled){background:var(--tally-red-h)}
+.btn-ghost{
+  padding:9px 13px;background:var(--navy-700);color:var(--white);font-size:12.5px;
+}
+.btn-ghost:hover:not(:disabled){background:#2A3D66}
+.btn-full{width:100%}
+
+.status-line{
+  font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:9px;
+  min-height:14px;line-height:1.5;white-space:pre-wrap;word-break:break-word;
+}
+.status-line.ok{color:var(--mint)}
+.status-line.err{color:var(--tally-red)}
+.status-line.warn{color:var(--flag-amber)}
+
+.tabs{display:flex;gap:6px;margin-bottom:12px;border-bottom:1px solid var(--navy-700)}
+.tab{
+  flex:1;text-align:center;padding:8px 4px;font-size:12px;font-weight:600;color:var(--ink-soft);
+  cursor:pointer;border-bottom:2px solid transparent;
+}
+.tab.active{color:var(--wire-cyan);border-bottom-color:var(--wire-cyan)}
+.tabpanel{display:none}
+.tabpanel.active{display:block}
+#imgPreview{border-radius:var(--r-sm);margin-top:6px;display:none;border:1px solid var(--navy-700);max-height:180px;object-fit:cover;width:100%}
+
+details.diag summary{cursor:pointer;font-size:11px;color:var(--ink-soft);list-style:none}
+details.diag summary::-webkit-details-marker{display:none}
+details.diag summary:before{content:'▸ ';color:var(--wire-cyan)}
+details.diag[open] summary:before{content:'▾ '}
+.diag pre{font:10.5px/1.5 var(--mono);white-space:pre-wrap;background:var(--navy-950);
+  padding:9px;border-radius:var(--r-sm);margin-top:8px;max-height:220px;overflow:auto;
+  color:var(--ink-soft);border:1px solid var(--navy-700)}
+
+/* ---- signal rail ---- */
+.signal-rail{display:flex;gap:0;margin-top:14px}
+.sig{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;position:relative}
+.sig:not(:last-child):after{
+  content:'';position:absolute;top:6px;left:56%;width:100%;height:2px;background:var(--navy-700);z-index:0;
+}
+.sig .dot{
+  width:13px;height:13px;border-radius:50%;background:var(--navy-700);
+  border:2px solid var(--navy-700);z-index:1;transition:all .25s ease;
+}
+.sig .lb{font-family:var(--mono);font-size:9px;letter-spacing:.8px;color:var(--ink-soft);
+  text-transform:uppercase;text-align:center}
+.sig.active .dot{background:var(--wire-cyan);border-color:var(--wire-cyan);
+  box-shadow:0 0 0 4px rgba(31,182,201,.2);animation:sig-pulse 1s ease-in-out infinite}
+.sig.active .lb{color:var(--wire-cyan)}
+.sig.done .dot{background:var(--mint);border-color:var(--mint)}
+.sig.done .lb{color:var(--mint)}
+.sig.error .dot{background:var(--tally-red);border-color:var(--tally-red)}
+.sig.error .lb{color:var(--tally-red)}
+@keyframes sig-pulse{0%,100%{box-shadow:0 0 0 4px rgba(31,182,201,.2)}50%{box-shadow:0 0 0 7px rgba(31,182,201,.06)}}
+
+/* ================= PAPER (light copy well) ================= */
+.paper-wrap{min-width:0}
+.paper{
+  background:var(--paper);border:1px solid var(--paper-line);border-radius:var(--r-lg);
+  overflow:hidden;
+}
+.paper-head{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+  padding:16px 20px;border-bottom:1px dashed var(--paper-line);
+}
+.paper-head h2{
+  font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:.6px;
+  text-transform:uppercase;color:var(--paper-ink);margin:0;
+}
+.paper-head .dateline{font-family:var(--mono);font-size:10.5px;color:var(--paper-dim);letter-spacing:.5px}
+.headline{
+  font-family:var(--serif);font-weight:700;font-size:26px;line-height:1.3;
+  color:var(--paper-ink);margin:0 0 16px;padding-bottom:14px;
+  border-bottom:2px solid var(--paper-ink);
+}
+
+.paper-body{padding:22px 22px 8px}
+.empty-state{
+  padding:50px 20px;text-align:center;color:var(--paper-dim);
+}
+.empty-state .mark{font-family:var(--display);font-size:46px;color:var(--paper-line);
+  font-weight:800;line-height:1}
+.empty-state p{font-family:var(--serif);font-size:14.5px;margin-top:10px;max-width:340px;
+  margin-left:auto;margin-right:auto}
+
+.gist{font-family:var(--serif);font-size:18px;line-height:1.85;color:var(--paper-ink)}
+.gist .sent{padding:1px 3px;border-radius:3px;box-decoration-break:clone;-webkit-box-decoration-break:clone}
+.gist .sent.flagged{background:var(--flag-amber-bg);border-bottom:2px solid var(--flag-amber)}
+
+.legend{display:flex;gap:16px;flex-wrap:wrap;margin-top:16px;padding-top:14px;
+  border-top:1px solid var(--paper-line);font-size:11px;color:var(--paper-dim)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:11px;height:11px;border-radius:3px;display:inline-block;flex-shrink:0}
+
+.stat-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:14px}
+.stat{font-family:var(--mono);font-size:11px;background:var(--paper-raised);
+  border:1px solid var(--paper-line);padding:6px 11px;border-radius:20px;color:var(--paper-ink)}
+.stat.accuracy{background:var(--mint-bg);border-color:var(--mint);color:var(--mint);font-weight:700}
+.stat.method{background:#E7F6F8;border-color:var(--wire-cyan);color:#0E7986}
+
+.paper-foot{padding:6px 22px 20px}
+details.reader summary{cursor:pointer;font-size:12px;color:var(--paper-dim);font-weight:600;
+  list-style:none;padding:8px 0}
+details.reader summary::-webkit-details-marker{display:none}
+details.reader summary:before{content:'▸ ';color:var(--wire-cyan)}
+details.reader[open] summary:before{content:'▾ '}
+ol.flag-list{font-size:13px;margin:8px 0 4px;padding-left:20px;color:var(--paper-ink)}
+ol.flag-list li{margin-bottom:10px;line-height:1.55}
+ol.flag-list .score{font-family:var(--mono);color:var(--flag-amber);font-weight:700}
+ol.flag-list .match{display:block;color:var(--paper-dim);font-size:12px;margin-top:2px}
+pre.raw{font:11px/1.6 var(--mono);white-space:pre-wrap;background:var(--paper-raised);
+  border:1px solid var(--paper-line);padding:12px;border-radius:var(--r-sm);
+  margin-top:8px;max-height:260px;overflow:auto;color:#4A4335}
+
+footer.foot{max-width:1440px;margin:0 auto;padding:8px 22px 34px;text-align:center;
+  font-family:var(--mono);font-size:10.5px;color:#3E4E76;letter-spacing:.4px}
+</style>
+</head>
+<body>
+
+<div class="topbar">
+  <div class="brand">
+    <span class="lamp"></span>
+    <h1>TJ <em>Wire</em></h1>
+    <span class="tag">Groq Newsroom Desk</span>
+  </div>
+  <div class="spacer"></div>
+  <div class="clock" id="clockOut">—</div>
+</div>
+
+<div class="shell">
+<div class="layout">
+
+  <!-- ============ CONSOLE ============ -->
+  <div class="console">
+
+    <div class="c-block">
+      <p class="c-eyebrow"><span class="num">1</span>Groq API key</p>
+      <label class="c-label">Key <span style="font-weight:400;color:var(--ink-soft)">(console.groq.com — free)</span></label>
+      <input type="password" id="groqKey" placeholder="gsk_..." autocomplete="off">
+      <div class="row">
+        <button class="btn-ghost btn-full" onclick="loadGroqModels()" type="button">Load models</button>
+      </div>
+      <div class="status-line" id="modelStatus"></div>
+      <details class="diag" id="modelDebugDetails" style="display:none">
+        <summary>Model diagnostics</summary>
+        <pre id="modelDebug"></pre>
+      </details>
+    </div>
+
+    <div class="c-block">
+      <p class="c-eyebrow"><span class="num">2</span>Models</p>
+      <label class="c-label">Writing model</label>
+      <select id="ghTextModel"><option value="">Load models first</option></select>
+      <label class="c-label">Vision model <span style="font-weight:400;color:var(--ink-soft)">(image tab)</span></label>
+      <select id="ghVisionModel"><option value="">Load models first</option></select>
+      <p class="c-hint" style="margin-top:-7px">Groq's multimodal lineup changes often — likely options are listed first, but any model can be picked; it'll error clearly if it can't read images.</p>
+
+      <label class="chk">
+        <input type="checkbox" id="useCompound" checked>
+        <span class="t">Fetch pages with Groq Compound
+          <small>Server-side browsing — visits the URL on Groq's infrastructure. Falls back to a direct proxy fetch automatically if unavailable.</small>
+        </span>
+      </label>
+    </div>
+
+    <div class="c-block">
+      <p class="c-eyebrow"><span class="num">3</span>Source</p>
+      <div class="tabs">
+        <div class="tab active" id="tab-url" onclick="switchTab('url')">URL</div>
+        <div class="tab" id="tab-text" onclick="switchTab('text')">Text</div>
+        <div class="tab" id="tab-img" onclick="switchTab('img')">Image</div>
+      </div>
+
+      <div class="tabpanel active" id="panel-url">
+        <label class="c-label">Article URL</label>
+        <input type="text" id="articleUrl" placeholder="https://www.dinamalar.com/news/...">
+        <button class="btn-ghost btn-full" onclick="fetchUrl()" type="button" id="fetchBtn">Preview fetch</button>
+        <p class="c-hint" style="margin-top:6px">Optional. "Generate gist" below fetches automatically — use this only if you want to check or edit the extracted text first.</p>
+        <div class="status-line" id="fetchStatus"></div>
+      </div>
+
+      <div class="tabpanel" id="panel-text">
+        <label class="c-label">Paste article text</label>
+        <textarea id="sourceTextDirect" placeholder="Paste the full source text here..."></textarea>
+      </div>
+
+      <div class="tabpanel" id="panel-img">
+        <label class="c-label">Upload a clipping / photo</label>
+        <input type="file" id="imgFile" accept="image/*" onchange="previewImg()">
+        <img id="imgPreview">
+      </div>
+
+      <details class="diag" style="margin-top:2px">
+        <summary>Extracted source text (editable)</summary>
+        <textarea id="sourceText" style="margin-top:8px" placeholder="Extracted / transcribed text lands here before summarizing."></textarea>
+      </details>
+    </div>
+
+    <div class="c-block">
+      <p class="c-eyebrow"><span class="num">4</span>Bulletin</p>
+      <label class="c-label">Target length (words)</label>
+      <input type="number" id="targetWords" value="70" min="15" max="500">
+      <button class="btn-primary" onclick="runPipeline()" id="genBtn" type="button">Generate gist</button>
+      <div class="signal-rail" id="signalRail">
+        <div class="sig" data-stage="fetch"><span class="dot"></span><span class="lb">Fetch</span></div>
+        <div class="sig" data-stage="extract"><span class="dot"></span><span class="lb">Extract</span></div>
+        <div class="sig" data-stage="draft"><span class="dot"></span><span class="lb">Draft</span></div>
+        <div class="sig" data-stage="verify"><span class="dot"></span><span class="lb">Verify</span></div>
+      </div>
+      <div class="status-line" id="genStatus"></div>
+    </div>
+
+  </div>
+
+  <!-- ============ PAPER ============ -->
+  <div class="paper-wrap">
+    <div class="paper">
+      <div class="paper-head">
+        <h2>Gist — Bulletin Copy</h2>
+        <span class="dateline" id="dateline">—</span>
+      </div>
+      <div class="paper-body">
+        <div class="empty-state" id="emptyState">
+          <div class="mark">§</div>
+          <p>Fetch a URL, paste text, or upload a clipping — then generate. Weakly-grounded lines get flagged automatically against the source.</p>
+        </div>
+
+        <div id="resultBlock" style="display:none">
+          <h3 class="headline" id="gistHeadline"></h3>
+          <div class="gist" id="gistOutput"></div>
+          <div class="legend">
+            <span><span class="sw" style="background:var(--flag-amber-bg);border:1px solid var(--flag-amber)"></span>Low similarity to source — verify before airing</span>
+            <span><span class="sw" style="background:var(--paper-raised);border:1px solid var(--paper-line)"></span>Well-grounded</span>
+          </div>
+          <div class="stat-row" id="statRow"></div>
+        </div>
+      </div>
+      <div class="paper-foot" id="paperFoot" style="display:none">
+        <details class="reader">
+          <summary>Flagged sentence detail</summary>
+          <ol class="flag-list" id="flagList"></ol>
+        </details>
+        <details class="reader" id="thinkingDetails" style="display:none">
+          <summary>Raw model output / reasoning</summary>
+          <pre class="raw" id="thinkingContent"></pre>
+        </details>
+      </div>
+    </div>
+  </div>
+
+</div>
+</div>
+
+<footer class="foot">GROQ INFERENCE · CLIENT-SIDE FAITHFULNESS CHECK · NO SERVER STORAGE</footer>
+
+<script type="module">
+import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.2';
+env.allowLocalModels = false;
+let embedder = null;
+let activeTab = 'url';
+
+/* clock */
+function tickClock(){
+  const d = new Date();
+  document.getElementById('clockOut').textContent =
+    d.toLocaleDateString('en-IN',{day:'2-digit',month:'short'}) + '  ' +
+    d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
+}
+tickClock(); setInterval(tickClock, 30000);
+
+/* ============ tabs ============ */
+window.switchTab = function (tab) {
+  activeTab = tab;
+  ['url','text','img'].forEach(t=>{
+    document.getElementById('tab-'+t).classList.toggle('active', t===tab);
+    document.getElementById('panel-'+t).classList.toggle('active', t===tab);
+  });
+};
+
+window.previewImg = function () {
+  const file = document.getElementById('imgFile').files[0];
+  if (!file) return;
+  const img = document.getElementById('imgPreview');
+  img.src = URL.createObjectURL(file);
+  img.style.display = 'block';
+};
+
+function fileToBase64(file) {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result.split(',')[1]);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+}
+
+/* ============ signal rail ============ */
+function setStage(stage, state){ // state: 'active' | 'done' | 'error' | ''
+  const el = document.querySelector('.sig[data-stage="'+stage+'"]');
+  if (!el) return;
+  el.classList.remove('active','done','error');
+  if (state) el.classList.add(state);
+}
+function resetStages(){ ['fetch','extract','draft','verify'].forEach(s=>setStage(s,'')); }
+
+/* ============ extraction: HTML ============ */
+function extractFromHTML(html) {
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(html, 'text/html');
+
+  const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
+  for (const script of scripts) {
+    try {
+      const data = JSON.parse(script.textContent);
+      if (data.articleBody) return data.articleBody;
+      if (Array.isArray(data['@graph'])) {
+        const article = data['@graph'].find(item => item.articleBody);
+        if (article) return article.articleBody;
+      }
+    } catch (e) {}
+  }
+
+  const selectors = [
+    '#contentdata', '.content_wrapper', '.artText',
+    '[itemprop="articleBody"]', '.story-element-text', '.article-body', 'article'
+  ];
+  for (const selector of selectors) {
+    const el = doc.querySelector(selector);
+    if (el) {
+      el.querySelectorAll('script, style, iframe, nav, header, footer, .related_stories, .ad, .social-share').forEach(n => n.remove());
+      const text = el.textContent.trim();
+      if (text.length > 200) return text;
+    }
+  }
+
+  doc.querySelectorAll('script, style, nav, header, footer, aside, .menu, .navigation').forEach(n => n.remove());
+  const paragraphs = [...doc.querySelectorAll('p')]
+    .map(p => p.textContent.trim())
+    .filter(text => text.length > 40 && !isBoilerplate(text));
+  return paragraphs.join('\n\n');
+}
+
+/* ============ extraction: Markdown (Jina Reader) ============ */
+function extractFromMarkdown(md) {
+  const lines = md.split('\n');
+  const kept = [];
+  for (let raw of lines) {
+    const line = raw.trim();
+    if (!line) continue;
+    if (/^(Title|URL Source|Published Time|Markdown Content):/i.test(line)) continue;
+    const linkChars = (line.match(/\[[^\]]*\]\([^)]*\)/g) || []).join('').length;
+    if (linkChars > line.length * 0.5) continue;           // link-list / nav row
+    if (/^\[.*\]\(https?:\/\/[^)]*\)\s*$/.test(line)) continue; // pure single link
+    if (/^#{1,6}\s/.test(line) && line.length < 40) continue;   // short heading/menu label
+    if (line.length < 40) continue;
+    if (isBoilerplate(line)) continue;
+    kept.push(line.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1')); // strip markdown link syntax, keep text
+  }
+  return kept.join('\n\n');
+}
+
+function isBoilerplate(text) {
+  const phrases = [
+    'Push Notifications','Select language','Search Quotes','Trending Stocks','Hello, Login',
+    'My Account','Go PRO Now','Copyright Reserved','Privacy Policy','Follow us on',
+    'Our Apps Available On','WhatsApp Channel','Subscribe','Sign in','Sign up','Download the app'
+  ];
+  return phrases.some(p => text.includes(p));
+}
+
+/* ============ faithfulness check ============ */
+async function getEmbedder(onProgress) {
+  if (embedder) return embedder;
+  embedder = await pipeline('feature-extraction', 'Xenova/multilingual-e5-small', { progress_callback: onProgress });
+  return embedder;
+}
+function cosineSim(a, b) {
+  let dot=0,na=0,nb=0;
+  for (let i=0;i<a.length;i++){dot+=a[i]*b[i];na+=a[i]*a[i];nb+=b[i]*b[i];}
+  return dot/(Math.sqrt(na)*Math.sqrt(nb)+1e-8);
+}
+function splitSentences(text){
+  return (text||'').replace(/\s+/g,' ')
+    .split(/(?<=[.!?।])\s+(?=[A-Z஀-௿])/u)
+    .map(s=>s.trim()).filter(s=>s.length>3);
+}
+async function embedAll(sentences, onProgress) {
+  const model = await getEmbedder(onProgress);
+  const vecs = [];
+  for (const s of sentences) {
+    const out = await model('query: '+s, { pooling:'mean', normalize:true });
+    vecs.push(Array.from(out.data));
+  }
+  return vecs;
+}
+async function checkGrounding(gistText, sourceText, onProgress) {
+  const gistSents = splitSentences(gistText);
+  const sourceSents = splitSentences(sourceText);
+  if (gistSents.length===0 || sourceSents.length===0) return [];
+  const gistVecs = await embedAll(gistSents, onProgress);
+  const sourceVecs = await embedAll(sourceSents, ()=>{});
+  return gistSents.map((sent,i)=>{
+    let best=-1, bestIdx=-1;
+    sourceVecs.forEach((sv,j)=>{const sim=cosineSim(gistVecs[i],sv); if (sim>best){best=sim;bestIdx=j;}});
+    return { sentence:sent, score:best, matchedSource: sourceSents[bestIdx]||'' };
+  });
+}
+
+/* ============ response / thinking parser ============ */
+function parseGroqResponse(rawText) {
+  const openIdx = rawText.search(/<think>/i);
+  const closeIdx = rawText.search(/<\/think>/i);
+
+  if (openIdx !== -1 && closeIdx === -1) {
+    // Model ran out of tokens while still "thinking" — never produced a real answer.
+    return { thinking: rawText.trim(), finalGist: '', truncated: true };
+  }
+
+  let thinking='', finalGist=rawText.trim();
+  const thinkMatch = rawText.match(/<think>([\s\S]*?)<\/think>/i);
+  if (thinkMatch) {
+    thinking = thinkMatch[1].trim();
+    finalGist = rawText.replace(/<think>[\s\S]*?<\/think>/gi,'').trim();
+  }
+  return { thinking, finalGist: finalGist || rawText, truncated: false };
+}
+
+/* pull "TITLE: ... / SUMMARY: ..." out of the final answer text */
+function parseTitledGist(text) {
+  const titleMatch = text.match(/TITLE:\s*(.+)/i);
+  const summaryMatch = text.match(/SUMMARY:\s*([\s\S]+)/i);
+  return {
+    title: titleMatch ? titleMatch[1].trim() : '',
+    summary: summaryMatch ? summaryMatch[1].trim() : text.trim()
+  };
+}
+
+/* reasoning models need explicit handling on Groq or they can burn the whole
+   token budget "thinking" and never emit an answer. Keep it off / hidden by default. */
+function reasoningParamsFor(model) {
+  if (/qwen3/i.test(model)) return { reasoning_effort: 'none' };
+  if (/gpt-oss/i.test(model)) return { reasoning_effort: 'low', reasoning_format: 'hidden' };
+  if (/deepseek|r1\b/i.test(model)) return { reasoning_format: 'hidden' };
+  return {};
+}
+
+/* ============ Groq calls ============ */
+const SYS_SUMMARY = (targetWords) => `You are a strict news summarizer. Rules:
+1. Summarize the given source text in approximately ${targetWords} words.
+2. Write the summary in the SAME LANGUAGE as the source text. Do not translate.
+3. Use ONLY facts, names, numbers, and claims explicitly present in the source text.
+4. Do NOT add any name, number, quote, cause, outcome, or claim not stated in the source.
+5. You may paraphrase and reorder freely — do not copy long verbatim spans.
+6. If the source is ambiguous or lacks detail, keep the summary vague rather than inventing specifics.
+7. Also write a short headline (under 12 words, same language as the source) that captures the story.
+8. Output in EXACTLY this format and nothing else — no preamble, no reasoning, no extra labels:
+TITLE: <the headline>
+SUMMARY: <the summary>`;
+
+const SYS_FETCH = `You are a web content extractor with browsing access. Visit the given URL and return ONLY the full body text of the main news article, verbatim, in its original language and script. Do not translate. Do not summarize. Do not include navigation menus, related-article lists, ads, comment counts, or social-share prompts. If the page cannot be reached or contains no article, respond with exactly: FETCH_FAILED`;
+
+window.loadGroqModels = async function () {
+  const key = document.getElementById('groqKey').value.trim();
+  const status = document.getElementById('modelStatus');
+  const debugDetails = document.getElementById('modelDebugDetails');
+  const debug = document.getElementById('modelDebug');
+  debugDetails.style.display='block'; debug.textContent=''; status.className='status-line';
+
+  if (!key) { status.textContent='Enter your Groq API key first.'; status.className='status-line err'; return; }
+  status.textContent='Loading models from Groq…';
+
+  try {
+    const response = await fetch('https://api.groq.com/openai/v1/models', {
+      headers: { 'Authorization':'Bearer '+key, 'Accept':'application/json' }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data?.error?.message || 'Groq request failed.');
+    debug.textContent = JSON.stringify(data, null, 2);
+
+    const models = Array.isArray(data.data) ? data.data : [];
+    const isUtility = m => /guard|whisper|compound|tts|prompt-guard/i.test(m.id);
+    const looksVisionCapable = m => /vision|scout|maverick|qwen3\.\d|multimodal|omni/i.test(m.id);
+
+    const textModels = models.filter(m => !isUtility(m));
+    // Don't hard-exclude by name (Groq's vision lineup changes often, e.g. qwen/qwen3.6-27b).
+    // Show every non-utility model, with likely-vision ones sorted first.
+    const visionModels = models
+      .filter(m => !isUtility(m))
+      .sort((a,b) => (looksVisionCapable(b) - looksVisionCapable(a)) || a.id.localeCompare(b.id));
+
+    const textSelect = document.getElementById('ghTextModel');
+    textSelect.innerHTML='';
+    textModels.forEach(m=>{ const o=document.createElement('option'); o.value=m.id; o.textContent=m.id; textSelect.appendChild(o); });
+
+    const visionSelect = document.getElementById('ghVisionModel');
+    visionSelect.innerHTML='';
+    if (visionModels.length===0){ const o=document.createElement('option'); o.value=''; o.textContent='No models found'; visionSelect.appendChild(o); }
+    visionModels.forEach(m=>{
+      const o=document.createElement('option'); o.value=m.id;
+      o.textContent = looksVisionCapable(m) ? m.id+' (likely vision)' : m.id;
+      visionSelect.appendChild(o);
+    });
+
+    status.textContent = `Loaded ${models.length} model(s). Compound systems (groq/compound) are used automatically for fetching and don't appear in this list.`;
+    status.className='status-line ok';
+  } catch (e) {
+    status.textContent = 'Error: ' + (e.message||e);
+    status.className='status-line err';
+  }
+};
+
+async function callGroq(messages, model, temperature=0.2, maxTokens=2000) {
+  const key = document.getElementById('groqKey').value.trim();
+  if (!key) throw new Error('No Groq key entered');
+  const body = {
+    model, messages, temperature,
+    max_completion_tokens: maxTokens,
+    ...reasoningParamsFor(model)
+  };
+  const r = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+    body: JSON.stringify(body)
+  });
+  const data = await r.json();
+  if (!r.ok) throw new Error(data?.error?.message || 'Groq API error');
+  return data.choices?.[0]?.message?.content?.trim() || '';
+}
+
+/* fetch article body via Groq Compound (server-side browsing) */
+async function fetchViaCompound(url) {
+  try {
+    const text = await callGroq([
+      { role:'system', content: SYS_FETCH },
+      { role:'user', content: url }
+    ], 'groq/compound', 0);
+    if (!text || text.includes('FETCH_FAILED') || text.length < 150) return null;
+    return text;
+  } catch (e) { return null; }
+}
+
+/* fallback: client-side proxy chain */
+async function fetchViaProxyChain(url, status) {
+  const fetchers = [
+    { name:'CORS Proxy', kind:'html', url:'https://corsproxy.io/?url='+encodeURIComponent(url) },
+    { name:'AllOrigins', kind:'json', url:'https://api.allorigins.win/get?url='+encodeURIComponent(url) },
+    { name:'Jina Reader', kind:'md',   url:'https://r.jina.ai/'+url },
+  ];
+  for (const f of fetchers) {
+    try {
+      status.textContent = 'Fetching via '+f.name+'…';
+      const r = await fetch(f.url, { signal: AbortSignal.timeout(12000) });
+      if (!r.ok) continue;
+      let raw='';
+      if (f.kind==='json') { const j = await r.json(); raw = j.contents || ''; }
+      else raw = await r.text();
+
+      const extracted = f.kind==='md' ? extractFromMarkdown(raw) : extractFromHTML(raw);
+      if (extracted && extracted.length > 150) {
+        return { text: extracted.slice(0,8000), via: f.name };
+      }
+    } catch (e) {}
+  }
+  return null;
+}
+
+/* ============ URL fetch orchestration (shared by preview button + pipeline) ============ */
+let lastFetchMethod = null;
+
+async function performFetch(url, status) {
+  let text=null, via=null;
+  if (document.getElementById('useCompound').checked) {
+    const key = document.getElementById('groqKey').value.trim();
+    if (!key) throw new Error('Enter your Groq key first.');
+    status.textContent='Visiting page via Groq Compound…';
+    text = await fetchViaCompound(url);
+    if (text) via = 'Groq Compound';
+  }
+  if (!text) {
+    status.textContent = (document.getElementById('useCompound').checked ? 'Compound unavailable — falling back to proxy chain…' : 'Fetching via proxy chain…');
+    const res = await fetchViaProxyChain(url, status);
+    if (res) { text = res.text; via = res.via; }
+  }
+  if (!text) return null;
+  lastFetchMethod = via;
+  return { text, via };
+}
+
+/* optional manual "preview fetch" button — not required before Generate */
+window.fetchUrl = async function () {
+  const url = document.getElementById('articleUrl').value.trim();
+  if (!url) return;
+  const status = document.getElementById('fetchStatus');
+  const btn = document.getElementById('fetchBtn');
+  status.className='status-line'; btn.disabled=true;
+  setStage('fetch','active');
+  try {
+    const res = await performFetch(url, status);
+    if (!res) {
+      status.textContent = 'Could not extract clean article text. Paste it manually in the Text tab.';
+      status.className='status-line err';
+      setStage('fetch','error');
+      return;
+    }
+    document.getElementById('sourceText').value = res.text;
+    status.textContent = `✓ Extracted ${res.text.length.toLocaleString()} chars via ${res.via}.`;
+    status.className='status-line ok';
+    setStage('fetch','done');
+    setStage('extract','done');
+  } catch (e) {
+    status.textContent = 'Error: ' + (e.message||e);
+    status.className='status-line err';
+    setStage('fetch','error');
+  } finally {
+    btn.disabled=false;
+  }
+};
+
+/* ============ main pipeline ============ */
+window.runPipeline = async function () {
+  const btn = document.getElementById('genBtn');
+  const status = document.getElementById('genStatus');
+  const targetWords = parseInt(document.getElementById('targetWords').value,10) || 70;
+
+  btn.disabled = true;
+  resetStages();
+  document.getElementById('emptyState').style.display='none';
+  document.getElementById('resultBlock').style.display='none';
+  document.getElementById('paperFoot').style.display='none';
+
+  try {
+    let sourceText;
+
+    if (activeTab === 'img') {
+      const file = document.getElementById('imgFile').files[0];
+      if (!file) throw new Error('Upload an image first.');
+      setStage('fetch','active');
+      status.textContent = 'Reading image…';
+      const base64 = await fileToBase64(file);
+      const model = document.getElementById('ghVisionModel').value;
+      if (!model) throw new Error('Load models and pick a vision model first.');
+      sourceText = await callGroq([
+        { role:'user', content: [
+          { type:'text', text:'Transcribe all text in this image, verbatim, in its original language.' },
+          { type:'image_url', image_url:{ url:`data:${file.type};base64,${base64}` } }
+        ]}
+      ], model);
+      setStage('fetch','done'); setStage('extract','done');
+      document.getElementById('sourceText').value = sourceText;
+
+    } else if (activeTab === 'text') {
+      sourceText = document.getElementById('sourceTextDirect').value.trim();
+      if (!sourceText) throw new Error('Paste source text first.');
+      setStage('fetch','done'); setStage('extract','done');
+      document.getElementById('sourceText').value = sourceText;
+
+    } else {
+      // URL tab — fetch automatically if the extracted-text box is still empty.
+      sourceText = document.getElementById('sourceText').value.trim();
+      if (!sourceText) {
+        const url = document.getElementById('articleUrl').value.trim();
+        if (!url) throw new Error('Enter an article URL first.');
+        setStage('fetch','active');
+        status.textContent = 'Fetching article…';
+        const res = await performFetch(url, status);
+        if (!res) throw new Error('Could not fetch/extract that page. Try the Text tab and paste it manually.');
+        sourceText = res.text;
+        document.getElementById('sourceText').value = sourceText;
+      }
+      setStage('fetch','done'); setStage('extract','done');
+    }
+
+    setStage('draft','active');
+    status.textContent = 'Drafting bulletin…';
+    const model = document.getElementById('ghTextModel').value;
+    if (!model) throw new Error('Load models and pick a writing model first.');
+    const targetTokens = Math.min(2000, Math.max(500, targetWords*6));
+    const rawGist = await callGroq([
+      { role:'system', content: SYS_SUMMARY(targetWords) },
+      { role:'user', content: sourceText }
+    ], model, 0.2, targetTokens);
+    const { thinking, finalGist, truncated } = parseGroqResponse(rawGist);
+
+    if (truncated || !finalGist) {
+      setStage('draft','error');
+      throw new Error('The model ran out of tokens while reasoning and never produced an answer. Try a different (non-reasoning) writing model, or raise the target word count.');
+    }
+    const { title, summary } = parseTitledGist(finalGist);
+    setStage('draft','done');
+
+    setStage('verify','active');
+    status.textContent = 'Checking faithfulness against source…';
+    const results = await checkGrounding(summary, sourceText, (p)=>{
+      if (p.status==='progress') status.textContent = `Loading verification model… ${Math.round(p.progress||0)}%`;
+    });
+    setStage('verify','done');
+
+    renderResults(title, summary, thinking, results, targetWords);
+    status.textContent = '✓ Done.';
+    status.className='status-line ok';
+  } catch (e) {
+    status.textContent = 'Error: ' + (e.message||e);
+    status.className='status-line err';
+    document.getElementById('emptyState').style.display='block';
+  } finally {
+    btn.disabled=false;
+  }
+};
+
+function renderResults(title, gist, thinking, results, targetWords) {
+  const THRESHOLD = 0.72;
+  document.getElementById('emptyState').style.display='none';
+  document.getElementById('resultBlock').style.display='block';
+  document.getElementById('paperFoot').style.display='block';
+  document.getElementById('dateline').textContent =
+    new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+  const headlineEl = document.getElementById('gistHeadline');
+  if (title) { headlineEl.textContent = title; headlineEl.style.display='block'; }
+  else headlineEl.style.display='none';
+
+  const gistOut = document.getElementById('gistOutput');
+  gistOut.innerHTML = results.map(r=>{
+    const cls = r.score < THRESHOLD ? 'sent flagged' : 'sent';
+    return `<span class="${cls}" title="similarity: ${r.score.toFixed(2)}">${escapeHtml(r.sentence)}</span> `;
+  }).join('');
+
+  const flagged = results.filter(r=>r.score<THRESHOLD);
+  document.getElementById('flagList').innerHTML = flagged.length
+    ? flagged.map(r=>`<li><span class="score">[${r.score.toFixed(2)}]</span> “${escapeHtml(r.sentence)}”<span class="match">closest source match: “${escapeHtml(r.matchedSource)}”</span></li>`).join('')
+    : '<li style="color:var(--mint)">None — every sentence matched the source well.</li>';
+
+  const thinkingDetailsEl = document.getElementById('thinkingDetails');
+  if (thinking) {
+    thinkingDetailsEl.style.display='block';
+    document.getElementById('thinkingContent').textContent = thinking;
+  } else thinkingDetailsEl.style.display='none';
+
+  const avgScore = results.length ? results.reduce((a,c)=>a+c.score,0)/results.length : 0;
+  const accuracyPercent = Math.min(100, Math.round(avgScore*100));
+  const wordCount = gist.split(/\s+/).filter(Boolean).length;
+
+  document.getElementById('statRow').innerHTML = `
+    <span class="stat accuracy">Faithfulness ${accuracyPercent}%</span>
+    <span class="stat">${wordCount} words · target ${targetWords}</span>
+    <span class="stat">${results.length} sentences</span>
+    <span class="stat">${flagged.length} flagged</span>
+    ${lastFetchMethod ? `<span class="stat method">via ${lastFetchMethod}</span>` : ''}
+  `;
+}
+
+function escapeHtml(s){ return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+</script>
+</body>
+</html>
