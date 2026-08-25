@@ -18,11 +18,11 @@
   --white:#F4F7FC;
 
   /* ---- paper (light, copy well) ---- */
-  --paper:#FAF6EC;
+  --paper:#FFFFFF;
   --paper-raised:#FFFFFF;
-  --paper-ink:#1B1710;
-  --paper-dim:#7A7264;
-  --paper-line:#E4DCC8;
+  --paper-ink:#142B45;
+  --paper-dim:#60758A;
+  --paper-line:#D6E3EF;
 
   /* ---- signal colors ---- */
   --wire-cyan:#1FB6C9;
@@ -44,7 +44,7 @@
 *{box-sizing:border-box}
 html,body{margin:0;padding:0}
 body{
-  background:var(--navy-950);
+  background:linear-gradient(135deg,#EAF3F9 0%,#F8FBFD 48%,#DDEBF5 100%);
   color:var(--white);
   font-family:var(--tamil-ui),-apple-system,'Segoe UI',sans-serif;
   font-size:14px;
@@ -159,6 +159,8 @@ button:disabled{opacity:.42;cursor:not-allowed;transform:none}
 .status-line.ok{color:var(--mint)}
 .status-line.err{color:var(--tally-red)}
 .status-line.warn{color:var(--flag-amber)}
+.usage-panel{margin-top:12px;padding:10px 11px;background:var(--navy-950);border:1px solid var(--navy-700);border-radius:var(--r-sm);font-family:var(--mono);font-size:10.5px;color:var(--ink-soft);line-height:1.7}
+.usage-panel strong{color:var(--wire-cyan);font-weight:700}
 
 .tabs{display:flex;gap:6px;margin-bottom:12px;border-bottom:1px solid var(--navy-700)}
 .tab{
@@ -204,6 +206,7 @@ details.diag[open] summary:before{content:'▾ '}
 .paper{
   background:var(--paper);border:1px solid var(--paper-line);border-radius:var(--r-lg);
   overflow:hidden;
+  box-shadow:0 14px 35px rgba(22,52,78,.10);
 }
 .paper-head{
   display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
@@ -219,6 +222,16 @@ details.diag[open] summary:before{content:'▾ '}
   color:var(--paper-ink);margin:0 0 16px;padding-bottom:14px;
   border-bottom:2px solid var(--paper-ink);
 }
+
+.output-grid{display:grid;gap:12px}
+.output-card{background:#F7FBFE;border:1px solid var(--paper-line);border-left:4px solid #2B78A8;border-radius:6px;overflow:hidden}
+.output-card.anchor{border-left-color:#2B78A8}
+.output-card.mos{border-left-color:#7654B8}
+.output-card.ticker{border-left-color:var(--flag-amber)}
+.output-label{display:flex;align-items:center;gap:10px;padding:9px 13px;background:#EDF5FA;border-bottom:1px solid var(--paper-line);font-family:var(--mono);font-size:10px;letter-spacing:1.2px;color:#286284;font-weight:700}
+.output-card.mos .output-label{color:#7654B8;background:#F5F1FC}
+.output-card.ticker .output-label{color:#A6630D;background:#FFF8E9}
+.output-copy{padding:13px 15px;font-family:var(--serif);font-size:17px;line-height:1.75;color:var(--paper-ink);white-space:pre-wrap}
 
 .paper-body{padding:22px 22px 8px}
 .empty-state{
@@ -285,9 +298,11 @@ footer.foot{max-width:1440px;margin:0 auto;padding:8px 22px 34px;text-align:cent
       <label class="c-label">Key <span style="font-weight:400;color:var(--ink-soft)">(console.groq.com — free)</span></label>
       <input type="password" id="groqKey" placeholder="gsk_..." autocomplete="off">
       <div class="row">
+        <button class="btn-ghost" onclick="saveGroqKey()" type="button">Save key</button>
         <button class="btn-ghost btn-full" onclick="loadGroqModels()" type="button">Load models</button>
       </div>
       <div class="status-line" id="modelStatus"></div>
+      <div class="usage-panel" id="usagePanel">Usage today: waiting for a response...</div>
       <details class="diag" id="modelDebugDetails" style="display:none">
         <summary>Model diagnostics</summary>
         <pre id="modelDebug"></pre>
@@ -374,7 +389,7 @@ footer.foot{max-width:1440px;margin:0 auto;padding:8px 22px 34px;text-align:cent
 
         <div id="resultBlock" style="display:none">
           <h3 class="headline" id="gistHeadline"></h3>
-          <div class="gist" id="gistOutput"></div>
+          <div class="output-grid" id="gistOutput"></div>
           <div class="legend">
             <span><span class="sw" style="background:var(--flag-amber-bg);border:1px solid var(--flag-amber)"></span>Low similarity to source — verify before airing</span>
             <span><span class="sw" style="background:var(--paper-raised);border:1px solid var(--paper-line)"></span>Well-grounded</span>
@@ -414,6 +429,64 @@ function tickClock(){
     d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
 }
 tickClock(); setInterval(tickClock, 30000);
+
+const GROQ_KEY_STORAGE = 'tj-wire-groq-api-key';
+function restoreGroqKey(){
+  const savedKey = localStorage.getItem(GROQ_KEY_STORAGE);
+  if (savedKey) {
+    document.getElementById('groqKey').value = savedKey;
+    document.getElementById('modelStatus').textContent = 'Saved key loaded from this browser.';
+    document.getElementById('modelStatus').className = 'status-line ok';
+  }
+}
+window.saveGroqKey = function(){
+  const key = document.getElementById('groqKey').value.trim();
+  const status = document.getElementById('modelStatus');
+  if (!key) {
+    status.textContent = 'Enter your Groq API key first.';
+    status.className = 'status-line err';
+    return;
+  }
+  localStorage.setItem(GROQ_KEY_STORAGE, key);
+  status.textContent = 'Key saved in this browser.';
+  status.className = 'status-line ok';
+};
+restoreGroqKey();
+
+const USAGE_STORAGE = 'tj-wire-groq-usage';
+function todayKey(){
+  const date = new Date();
+  return [date.getFullYear(),String(date.getMonth()+1).padStart(2,'0'),String(date.getDate()).padStart(2,'0')].join('-');
+}
+function readUsage(){
+  try {
+    const saved = JSON.parse(localStorage.getItem(USAGE_STORAGE) || '{}');
+    return saved.date === todayKey() ? saved : { date:todayKey(), requests:0, prompt:0, completion:0, total:0, latest:null };
+  } catch (e) {
+    return { date:todayKey(), requests:0, prompt:0, completion:0, total:0, latest:null };
+  }
+}
+function renderUsage(usage){
+  const latest = usage.latest;
+  document.getElementById('usagePanel').innerHTML = latest
+    ? `Today in this browser: <strong>${usage.requests} request(s)</strong> · <strong>${usage.total.toLocaleString()} tokens</strong><br>Latest: ${latest.model} · prompt ${latest.prompt.toLocaleString()} · completion ${latest.completion.toLocaleString()} · total ${latest.total.toLocaleString()}`
+    : 'Usage today: waiting for a response...';
+}
+function recordUsage(apiUsage, model){
+  if (!apiUsage) return;
+  const usage = readUsage();
+  const prompt = Number(apiUsage.prompt_tokens) || 0;
+  const completion = Number(apiUsage.completion_tokens) || 0;
+  const total = Number(apiUsage.total_tokens) || prompt + completion;
+  usage.requests += 1;
+  usage.prompt += prompt;
+  usage.completion += completion;
+  usage.total += total;
+  usage.latest = { model, prompt, completion, total };
+  localStorage.setItem(USAGE_STORAGE, JSON.stringify(usage));
+  renderUsage(usage);
+}
+renderUsage(readUsage());
 
 /* ============ tabs ============ */
 window.switchTab = function (tab) {
@@ -572,13 +645,22 @@ function parseGroqResponse(rawText) {
   return { thinking, finalGist: finalGist || rawText, truncated: false };
 }
 
-/* pull "TITLE: ... / SUMMARY: ..." out of the final answer text */
-function parseTitledGist(text) {
+/* Pull the newsroom blocks out of the model response. */
+function parseNewsroomOutput(text) {
+  const readSection = (label, nextLabels) => {
+    const boundary = nextLabels.join('|');
+    const match = text.match(new RegExp(label+'\\s*([\\s\\S]*?)(?=\\n\\s*(?:'+boundary+')\\s*:|$)', 'i'));
+    return match ? match[1].trim() : '';
+  };
   const titleMatch = text.match(/TITLE:\s*(.+)/i);
-  const summaryMatch = text.match(/SUMMARY:\s*([\s\S]+)/i);
+  const vo = readSection('VO:', ['VO ANCHOR', 'MOS SLUG', 'TICKER']);
+  const legacySummary = readSection('SUMMARY:', []);
   return {
     title: titleMatch ? titleMatch[1].trim() : '',
-    summary: summaryMatch ? summaryMatch[1].trim() : text.trim()
+    vo: vo || legacySummary || text.trim(),
+    anchor: readSection('VO ANCHOR:', ['MOS SLUG', 'TICKER']),
+    mosSlug: readSection('MOS SLUG:', ['TICKER']),
+    ticker: readSection('TICKER:', [])
   };
 }
 
@@ -603,9 +685,13 @@ const SYS_SUMMARY = (targetWords) => `You are a strict news summarizer. Rules:
 8. You may paraphrase and reorder freely - do not copy long verbatim spans.
 9. If the source is ambiguous or lacks detail, keep the summary vague rather than inventing specifics.
 10. Also write a short headline (under 12 words, same language as the source) that captures the story.
-11. Output in EXACTLY this format and nothing else — no preamble, no reasoning, no extra labels:
+11. Write four newsroom versions. VO is the complete main copy. VO ANCHOR is a short anchor intro. MOS SLUG is a concise visual slug. TICKER is a very short scrolling line.
+12. Output in EXACTLY this format and nothing else — no preamble, no reasoning, no extra labels:
 TITLE: <the headline>
-SUMMARY: <the summary>`;
+VO: <the complete broadcast copy>
+VO ANCHOR: <the short anchor intro>
+MOS SLUG: <the concise visual slug>
+TICKER: <the short ticker line>`;
 
 const SYS_FETCH = `You are a web content extractor with browsing access. Visit the given URL and return ONLY the full body text of the main news article, verbatim, in its original language and script. Do not translate. Do not summarize. Do not include navigation menus, related-article lists, ads, comment counts, or social-share prompts. If the page cannot be reached or contains no article, respond with exactly: FETCH_FAILED`;
 
@@ -674,6 +760,7 @@ async function callGroq(messages, model, temperature=0.2, maxTokens=2000) {
   });
   const data = await r.json();
   if (!r.ok) throw new Error(data?.error?.message || 'Groq API error');
+  recordUsage(data.usage, model);
   return data.choices?.[0]?.message?.content?.trim() || '';
 }
 
@@ -835,17 +922,17 @@ window.runPipeline = async function () {
       setStage('draft','error');
       throw new Error('The model ran out of tokens while reasoning and never produced an answer. Try a different (non-reasoning) writing model, or raise the target word count.');
     }
-    const { title, summary } = parseTitledGist(finalGist);
+    const { title, vo, anchor, mosSlug, ticker } = parseNewsroomOutput(finalGist);
     setStage('draft','done');
 
     setStage('verify','active');
     status.textContent = 'Checking faithfulness against source…';
-    const results = await checkGrounding(summary, sourceText, (p)=>{
+    const results = await checkGrounding(vo, sourceText, (p)=>{
       if (p.status==='progress') status.textContent = `Loading verification model… ${Math.round(p.progress||0)}%`;
     });
     setStage('verify','done');
 
-    renderResults(title, summary, thinking, results, targetWords);
+    renderResults(title, vo, anchor, mosSlug, ticker, thinking, results, targetWords);
     status.textContent = '✓ Done.';
     status.className='status-line ok';
   } catch (e) {
@@ -857,7 +944,7 @@ window.runPipeline = async function () {
   }
 };
 
-function renderResults(title, gist, thinking, results, targetWords) {
+function renderResults(title, vo, anchor, mosSlug, ticker, thinking, results, targetWords) {
   const THRESHOLD = 0.72;
   document.getElementById('emptyState').style.display='none';
   document.getElementById('resultBlock').style.display='block';
@@ -870,10 +957,15 @@ function renderResults(title, gist, thinking, results, targetWords) {
   else headlineEl.style.display='none';
 
   const gistOut = document.getElementById('gistOutput');
-  gistOut.innerHTML = results.map(r=>{
+  const voHtml = results.map(r=>{
     const cls = r.score < THRESHOLD ? 'sent flagged' : 'sent';
     return `<span class="${cls}" title="similarity: ${r.score.toFixed(2)}">${escapeHtml(r.sentence)}</span> `;
   }).join('');
+  gistOut.innerHTML = `
+    <section class="output-card"><div class="output-label">VO</div><div class="output-copy gist">${voHtml}</div></section>
+    <section class="output-card anchor"><div class="output-label">VO ANCHOR</div><div class="output-copy">${escapeHtml(anchor || vo)}</div></section>
+    <section class="output-card mos"><div class="output-label">MOS SLUG</div><div class="output-copy">${escapeHtml(mosSlug || title || vo)}</div></section>
+    <section class="output-card ticker"><div class="output-label">TICKER</div><div class="output-copy">${escapeHtml(ticker || title || vo)}</div></section>`;
 
   const flagged = results.filter(r=>r.score<THRESHOLD);
   document.getElementById('flagList').innerHTML = flagged.length
@@ -888,7 +980,7 @@ function renderResults(title, gist, thinking, results, targetWords) {
 
   const avgScore = results.length ? results.reduce((a,c)=>a+c.score,0)/results.length : 0;
   const accuracyPercent = Math.min(100, Math.round(avgScore*100));
-  const wordCount = gist.split(/\s+/).filter(Boolean).length;
+  const wordCount = vo.split(/\s+/).filter(Boolean).length;
 
   document.getElementById('statRow').innerHTML = `
     <span class="stat accuracy">Faithfulness ${accuracyPercent}%</span>
