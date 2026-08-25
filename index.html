@@ -362,6 +362,17 @@ footer.foot{max-width:1440px;margin:0 auto;padding:8px 22px 34px;text-align:cent
       <p class="c-eyebrow"><span class="num">4</span>Bulletin</p>
       <label class="c-label">Target length (words)</label>
       <input type="number" id="targetWords" value="70" min="15" max="500">
+      <div class="row">
+        <div>
+          <label class="c-label">VO Anchor duration (sec)</label>
+          <input type="number" id="anchorSeconds" value="30" min="5" max="600" step="1">
+        </div>
+        <div>
+          <label class="c-label">Speaking rate (WPM)</label>
+          <input type="number" id="anchorWpm" value="105" min="60" max="200" step="5">
+        </div>
+      </div>
+      <p class="c-hint">Tamil broadcast rate: 105 WPM, or 1.75 words per second. Duration applies only to VO Anchor.</p>
       <button class="btn-primary" onclick="runPipeline()" id="genBtn" type="button">Generate gist</button>
       <div class="signal-rail" id="signalRail">
         <div class="sig" data-stage="fetch"><span class="dot"></span><span class="lb">Fetch</span></div>
@@ -674,7 +685,7 @@ function reasoningParamsFor(model) {
 }
 
 /* ============ Groq calls ============ */
-const SYS_SUMMARY = (targetWords) => `You are a strict news summarizer. Rules:
+const SYS_SUMMARY = (targetWords, anchorWords, anchorSeconds) => `You are a strict news summarizer. Rules:
 1. Summarize the given source text in approximately ${targetWords} words.
 2. Write the summary in the SAME LANGUAGE as the source text. Do not translate.
 3. Use ONLY facts, names, numbers, and claims explicitly present in the source text.
@@ -685,7 +696,7 @@ const SYS_SUMMARY = (targetWords) => `You are a strict news summarizer. Rules:
 8. You may paraphrase and reorder freely - do not copy long verbatim spans.
 9. If the source is ambiguous or lacks detail, keep the summary vague rather than inventing specifics.
 10. Also write a short headline (under 12 words, same language as the source) that captures the story.
-11. Write four newsroom versions. VO is the complete main copy. VO ANCHOR is a short anchor intro. MOS SLUG is a concise visual slug. TICKER is a very short scrolling line.
+11. Write four newsroom versions. VO is the complete main copy, approximately ${targetWords} words. VO ANCHOR is only the anchor intro, approximately ${anchorWords} words for ${anchorSeconds} seconds at the selected speaking rate. MOS SLUG is a concise visual slug. TICKER is a very short scrolling line.
 12. Output in EXACTLY this format and nothing else — no preamble, no reasoning, no extra labels:
 TITLE: <the headline>
 VO: <the complete broadcast copy>
@@ -858,6 +869,9 @@ window.runPipeline = async function () {
   const btn = document.getElementById('genBtn');
   const status = document.getElementById('genStatus');
   const targetWords = parseInt(document.getElementById('targetWords').value,10) || 70;
+  const anchorSeconds = parseInt(document.getElementById('anchorSeconds').value,10) || 30;
+  const anchorWpm = parseInt(document.getElementById('anchorWpm').value,10) || 105;
+  const anchorWords = Math.max(5, Math.round(anchorSeconds * anchorWpm / 60));
 
   btn.disabled = true;
   resetStages();
@@ -913,7 +927,7 @@ window.runPipeline = async function () {
     if (!model) throw new Error('Load models and pick a writing model first.');
     const targetTokens = Math.min(2000, Math.max(500, targetWords*6));
     const rawGist = await callGroq([
-      { role:'system', content: SYS_SUMMARY(targetWords) },
+      { role:'system', content: SYS_SUMMARY(targetWords, anchorWords, anchorSeconds) },
       { role:'user', content: sourceText }
     ], model, 0.2, targetTokens);
     const { thinking, finalGist, truncated } = parseGroqResponse(rawGist);
