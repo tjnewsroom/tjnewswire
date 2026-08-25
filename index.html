@@ -55,7 +55,14 @@ img{max-width:100%;display:block}
 input,select,textarea,button{font-family:inherit;font-size:16px}
 ::selection{background:rgba(31,182,201,.28)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-
+.btn-read,.btn-record{
+  padding:9px 13px;background:var(--tally-red);color:#fff;font-size:12.5px;
+  margin-top:10px;display:inline-flex;align-items:center;gap:6px;
+}
+.btn-read:hover:not(:disabled),.btn-record:hover:not(:disabled){background:var(--tally-red-h)}
+.btn-record.recording{background:var(--flag-amber);animation:rec-pulse 1s ease-in-out infinite}
+.vo-actions{display:flex;flex-wrap:wrap;gap:8px}
+@keyframes rec-pulse{0%,100%{opacity:1}50%{opacity:.6}}
 /* ================= TOPBAR ================= */
 .topbar{
   display:flex;align-items:center;gap:14px;
@@ -410,7 +417,11 @@ footer.foot{max-width:1440px;margin:0 auto;padding:8px 22px 34px;text-align:cent
             <span><span class="sw" style="background:var(--paper-raised);border:1px solid var(--paper-line)"></span>Well-grounded</span>
           </div>
           <div class="stat-row" id="statRow"></div>
-        </div>
+<div class="vo-actions">
+<button class="btn-read" id="readBtn" onclick="readVO()" type="button">🔊 Read VO</button>
+<button class="btn-record" id="recordBtn" onclick="recordVO()" type="button">⏺ Record VO</button>
+</div>
+<div class="status-line" id="recordStatus"></div>        </div>
       </div>
       <div class="paper-foot" id="paperFoot" style="display:none">
         <details class="reader">
@@ -709,8 +720,12 @@ const SYS_SUMMARY = (anchorWords, anchorSeconds) => `You are a strict news summa
 16. You may paraphrase and reorder freely - do not copy long verbatim spans.
 17. If the source is ambiguous or lacks detail, keep the summary vague rather than inventing specifics.
 18. Also write a short headline (under 12 words, same language as the source) that captures the story.
-19. Write four newsroom versions. VO is the complete main copy with natural length, written as continuous flowing paragraphs (not line-by-line fragments). VO ANCHOR is only the anchor intro, approximately ${anchorWords} words for ${anchorSeconds} seconds at the selected speaking rate, and must NOT repeat the VO's opening sentence verbatim — it should tease or summarize instead. MOS SLUG is a concise visual slug. TICKER is a very short scrolling line.
-20. Output in EXACTLY this format and nothing else — no preamble, no reasoning, no extra labels:
+19. Every field (VO, VO ANCHOR, MOS SLUG, TICKER) must end on a complete word and a complete sentence or phrase. NEVER cut off mid-word. If you are approaching a length limit for VO ANCHOR or MOS SLUG, finish the current phrase in fewer words rather than stopping mid-word or mid-sentence. Each field must be a fully formed, grammatically complete output on its own.
+20. MOS SLUG and TICKER must be written in the SAME LANGUAGE as VO and VO ANCHOR — never switch the whole field to English. If the source contains an English brand, company, or proper noun (e.g. "Rolls-Royce," "Sigma Advanced Systems"), keep that specific name in its original script, but write the rest of the sentence in the source language. Do not let an English proper noun cause the entire field to be written in English.
+21. MOS SLUG must be a complete phrase of 4–8 words maximum, on-topic and self-contained.
+22. TICKER must be a complete phrase of 6–10 words maximum.
+23. Write four newsroom versions. VO is the complete main copy with natural length, written as continuous flowing paragraphs (not line-by-line fragments). VO ANCHOR is only the anchor intro, approximately ${anchorWords} words for ${anchorSeconds} seconds at the selected speaking rate, and must NOT repeat the VO's opening sentence verbatim — it should tease or summarize instead. MOS SLUG is a concise visual slug. TICKER is a very short scrolling line.
+24. Output in EXACTLY this format and nothing else — no preamble, no reasoning, no extra labels:
 TITLE: <the headline>
 VO: <the complete broadcast copy>
 VO ANCHOR: <the short anchor intro>
@@ -1018,6 +1033,139 @@ function renderResults(title, vo, anchor, mosSlug, ticker, thinking, results) {
 }
 
 function escapeHtml(s){ return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+/* ============ Read & Record ============ */
+let currentVoTextForTTS = '';
+let recorder, recChunks = [];
+
+function updateCurrentVoText(vo) {
+  // strip HTML tags in case anything is passed with markup
+  currentVoTextForTTS = vo || '';
+}
+
+function getTamilVoice() {
+  return speechSynthesis.getVoices().find(voice => /^ta(-|_)/i.test(voice.lang));
+}
+
+function prepareTamilSpeech(text) {
+  const tamilThousands = {
+    1:'ஒராயிரம்', 2:'இரண்டாயிரம்', 3:'மூன்றாயிரம்', 4:'நான்காயிரம்',
+    5:'ஐந்தாயிரம்', 6:'ஆறாயிரம்', 7:'ஏழாயிரம்', 8:'எட்டாயிரம்',
+    9:'ஒன்பதாயிரம்', 10:'பத்தாயிரம்', 11:'பதினோராயிரம்', 12:'பன்னிரண்டாயிரம்',
+    13:'பதின்மூன்றாயிரம்', 14:'பதினான்காயிரம்', 15:'பதினைந்தாயிரம்',
+    16:'பதினாறாயிரம்', 17:'பதினேழாயிரம்', 18:'பதினெட்டாயிரம்', 19:'பத்தொன்பதாயிரம்',
+    20:'இருபதாயிரம்'
+  };
+  return text
+    .replace(/\b(\d{1,2}),000\b/g, (match, value) => tamilThousands[Number(value)] || match)
+    .replace(/\b(\d+)\.00\b/g, '$1');
+}
+
+window.readVO = function () {
+  const readBtn = document.getElementById('readBtn');
+  const status = document.getElementById('recordStatus');
+
+  if (!currentVoTextForTTS) {
+    status.textContent = 'No VO text to read yet — generate a gist first.';
+    status.className = 'status-line err';
+    return;
+  }
+  if (!('speechSynthesis' in window)) {
+    status.textContent = 'This browser does not support speech synthesis.';
+    status.className = 'status-line err';
+    return;
+  }
+  const tamilVoice = getTamilVoice();
+  if (!tamilVoice) {
+    status.textContent = 'Tamil speech voice is not installed. Add Tamil Text-to-speech in Windows settings.';
+    status.className = 'status-line err';
+    return;
+  }
+
+  speechSynthesis.cancel();
+  readBtn.disabled = true;
+  status.textContent = 'Reading VO aloud…';
+  status.className = 'status-line';
+  const utterance = new SpeechSynthesisUtterance(prepareTamilSpeech(currentVoTextForTTS));
+  utterance.voice = tamilVoice;
+  utterance.lang = 'ta-IN';
+  utterance.rate = 0.9;
+  utterance.onend = () => {
+    readBtn.disabled = false;
+    status.textContent = '✓ VO reading complete.';
+    status.className = 'status-line ok';
+  };
+  utterance.onerror = () => {
+    readBtn.disabled = false;
+    status.textContent = 'Could not read the VO aloud.';
+    status.className = 'status-line err';
+  };
+  speechSynthesis.speak(utterance);
+};
+
+window.recordVO = async function () {
+  const recBtn = document.getElementById('recordBtn');
+  const status = document.getElementById('recordStatus');
+
+  if (!currentVoTextForTTS) {
+    status.textContent = 'No VO text to read yet — generate a gist first.';
+    status.className = 'status-line err';
+    return;
+  }
+  if (!('speechSynthesis' in window)) {
+    status.textContent = 'This browser does not support speech synthesis.';
+    status.className = 'status-line err';
+    return;
+  }
+  const tamilVoice = getTamilVoice();
+  if (!tamilVoice) {
+    status.textContent = 'Tamil speech voice is not installed. Add Tamil Text-to-speech in Windows settings.';
+    status.className = 'status-line err';
+    return;
+  }
+
+  recBtn.disabled = true;
+  recBtn.classList.add('recording');
+  status.textContent = 'Requesting audio capture permission — choose "share audio" in the prompt…';
+  status.className = 'status-line';
+
+  try {
+    const stream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true, preferCurrentTab: true });
+    stream.getVideoTracks().forEach(track => track.stop());
+    recChunks = [];
+    recorder = new MediaRecorder(stream);
+    recorder.ondataavailable = e => { if (e.data.size > 0) recChunks.push(e.data); };
+    recorder.onstop = () => {
+      stream.getTracks().forEach(t => t.stop());
+      const blob = new Blob(recChunks, { type: 'audio/webm' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `bulletin_audio_${Date.now()}.webm`;
+      a.click();
+      status.textContent = '✓ Recording saved and downloaded.';
+      status.className = 'status-line ok';
+      recBtn.disabled = false;
+      recBtn.classList.remove('recording');
+    };
+
+    recorder.start();
+    status.textContent = 'Reading VO aloud and recording…';
+
+    const utterance = new SpeechSynthesisUtterance(prepareTamilSpeech(currentVoTextForTTS));
+    utterance.voice = tamilVoice;
+    utterance.lang = 'ta-IN';
+    utterance.rate = 0.9;
+    utterance.onend = () => setTimeout(() => { if (recorder.state !== 'inactive') recorder.stop(); }, 500);
+    utterance.onerror = () => { if (recorder.state !== 'inactive') recorder.stop(); };
+    speechSynthesis.speak(utterance);
+
+  } catch (err) {
+    status.textContent = 'Recording permission denied or unsupported: ' + (err.message || err);
+    status.className = 'status-line err';
+    recBtn.disabled = false;
+    recBtn.classList.remove('recording');
+  }
+};
 </script>
 </body>
 </html>
