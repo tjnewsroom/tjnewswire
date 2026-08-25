@@ -151,6 +151,10 @@ button:disabled{opacity:.42;cursor:not-allowed;transform:none}
 }
 .btn-ghost:hover:not(:disabled){background:#2A3D66}
 .btn-full{width:100%}
+.info-tip{position:relative;display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;margin-left:4px;border:1px solid var(--wire-cyan);border-radius:50%;background:transparent;color:var(--wire-cyan);font:700 10px/1 var(--mono);cursor:help;vertical-align:middle}
+.info-tip:focus{outline:2px solid var(--wire-cyan);outline-offset:2px}
+.info-tip::after{content:attr(data-tip);position:absolute;left:0;top:calc(100% + 8px);z-index:20;width:245px;padding:9px 10px;border:1px solid var(--navy-700);border-radius:var(--r-sm);background:var(--navy-950);color:var(--white);font:10.5px/1.5 var(--tamil-ui);font-weight:400;text-align:left;box-shadow:0 6px 18px rgba(0,0,0,.25);opacity:0;pointer-events:none;transform:translateY(-3px);transition:opacity .15s ease,transform .15s ease}
+.info-tip:hover::after,.info-tip:focus::after{opacity:1;transform:translateY(0)}
 
 .status-line{
   font-family:var(--mono);font-size:11px;color:var(--ink-soft);margin-top:9px;
@@ -360,11 +364,15 @@ footer.foot{max-width:1440px;margin:0 auto;padding:8px 22px 34px;text-align:cent
 
     <div class="c-block">
       <p class="c-eyebrow"><span class="num">4</span>Bulletin</p>
-      <label class="c-label">Target length (words)</label>
+      <label class="c-label">Target length (words)
+        <button class="info-tip" type="button" aria-label="Duration and word target guidance" data-tip="VO uses the word target. VO Anchor uses seconds converted at the selected WPM. Both are used because they control different outputs. If both refer to the same copy, duration takes priority.">i</button>
+      </label>
       <input type="number" id="targetWords" value="70" min="15" max="500">
       <div class="row">
         <div>
-          <label class="c-label">VO Anchor duration (sec)</label>
+          <label class="c-label">VO Anchor duration (sec)
+            <button class="info-tip" type="button" aria-label="VO Anchor duration guidance" data-tip="Enter seconds for the anchor. The word target is calculated as seconds × WPM ÷ 60. Current default: 105 WPM, or 1.75 words per second.">i</button>
+          </label>
           <input type="number" id="anchorSeconds" value="30" min="5" max="600" step="1">
         </div>
         <div>
