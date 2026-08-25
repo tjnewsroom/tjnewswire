@@ -364,14 +364,10 @@ footer.foot{max-width:1440px;margin:0 auto;padding:8px 22px 34px;text-align:cent
 
     <div class="c-block">
       <p class="c-eyebrow"><span class="num">4</span>Bulletin</p>
-      <label class="c-label">Target length (words)
-        <button class="info-tip" type="button" aria-label="Duration and word target guidance" data-tip="VO uses the word target. VO Anchor uses seconds converted at the selected WPM. Both are used because they control different outputs. If both refer to the same copy, duration takes priority.">i</button>
-      </label>
-      <input type="number" id="targetWords" value="70" min="15" max="500">
       <div class="row">
         <div>
           <label class="c-label">VO Anchor duration (sec)
-            <button class="info-tip" type="button" aria-label="VO Anchor duration guidance" data-tip="Enter seconds for the anchor. The word target is calculated as seconds × WPM ÷ 60. Current default: 105 WPM, or 1.75 words per second.">i</button>
+            <button class="info-tip" type="button" aria-label="Duration guidance" data-tip="Duration is the only length control. It applies to VO Anchor. The word estimate is seconds × WPM ÷ 60. VO is generated naturally from the source without a separate word limit.">i</button>
           </label>
           <input type="number" id="anchorSeconds" value="30" min="5" max="600" step="1">
         </div>
@@ -693,8 +689,8 @@ function reasoningParamsFor(model) {
 }
 
 /* ============ Groq calls ============ */
-const SYS_SUMMARY = (targetWords, anchorWords, anchorSeconds) => `You are a strict news summarizer. Rules:
-1. Summarize the given source text in approximately ${targetWords} words.
+const SYS_SUMMARY = (anchorWords, anchorSeconds) => `You are a strict news summarizer. Rules:
+1. Summarize the given source text naturally, keeping the important verified facts.
 2. Write the summary in the SAME LANGUAGE as the source text. Do not translate.
 3. Use ONLY facts, names, numbers, and claims explicitly present in the source text.
 4. Do NOT add any name, number, quote, cause, outcome, or claim not stated in the source.
@@ -704,7 +700,7 @@ const SYS_SUMMARY = (targetWords, anchorWords, anchorSeconds) => `You are a stri
 8. You may paraphrase and reorder freely - do not copy long verbatim spans.
 9. If the source is ambiguous or lacks detail, keep the summary vague rather than inventing specifics.
 10. Also write a short headline (under 12 words, same language as the source) that captures the story.
-11. Write four newsroom versions. VO is the complete main copy, approximately ${targetWords} words. VO ANCHOR is only the anchor intro, approximately ${anchorWords} words for ${anchorSeconds} seconds at the selected speaking rate. MOS SLUG is a concise visual slug. TICKER is a very short scrolling line.
+11. Write four newsroom versions. VO is the complete main copy with natural length. VO ANCHOR is only the anchor intro, approximately ${anchorWords} words for ${anchorSeconds} seconds at the selected speaking rate. MOS SLUG is a concise visual slug. TICKER is a very short scrolling line.
 12. Output in EXACTLY this format and nothing else — no preamble, no reasoning, no extra labels:
 TITLE: <the headline>
 VO: <the complete broadcast copy>
@@ -876,7 +872,6 @@ window.fetchUrl = async function () {
 window.runPipeline = async function () {
   const btn = document.getElementById('genBtn');
   const status = document.getElementById('genStatus');
-  const targetWords = parseInt(document.getElementById('targetWords').value,10) || 70;
   const anchorSeconds = parseInt(document.getElementById('anchorSeconds').value,10) || 30;
   const anchorWpm = parseInt(document.getElementById('anchorWpm').value,10) || 105;
   const anchorWords = Math.max(5, Math.round(anchorSeconds * anchorWpm / 60));
@@ -933,9 +928,9 @@ window.runPipeline = async function () {
     status.textContent = 'Drafting bulletin…';
     const model = document.getElementById('ghTextModel').value;
     if (!model) throw new Error('Load models and pick a writing model first.');
-    const targetTokens = Math.min(2000, Math.max(500, targetWords*6));
+    const targetTokens = Math.min(2000, Math.max(500, anchorWords * 6));
     const rawGist = await callGroq([
-      { role:'system', content: SYS_SUMMARY(targetWords, anchorWords, anchorSeconds) },
+      { role:'system', content: SYS_SUMMARY(anchorWords, anchorSeconds) },
       { role:'user', content: sourceText }
     ], model, 0.2, targetTokens);
     const { thinking, finalGist, truncated } = parseGroqResponse(rawGist);
@@ -954,7 +949,7 @@ window.runPipeline = async function () {
     });
     setStage('verify','done');
 
-    renderResults(title, vo, anchor, mosSlug, ticker, thinking, results, targetWords);
+    renderResults(title, vo, anchor, mosSlug, ticker, thinking, results);
     status.textContent = '✓ Done.';
     status.className='status-line ok';
   } catch (e) {
@@ -966,7 +961,7 @@ window.runPipeline = async function () {
   }
 };
 
-function renderResults(title, vo, anchor, mosSlug, ticker, thinking, results, targetWords) {
+function renderResults(title, vo, anchor, mosSlug, ticker, thinking, results) {
   const THRESHOLD = 0.72;
   document.getElementById('emptyState').style.display='none';
   document.getElementById('resultBlock').style.display='block';
@@ -1006,7 +1001,7 @@ function renderResults(title, vo, anchor, mosSlug, ticker, thinking, results, ta
 
   document.getElementById('statRow').innerHTML = `
     <span class="stat accuracy">Faithfulness ${accuracyPercent}%</span>
-    <span class="stat">${wordCount} words · target ${targetWords}</span>
+    <span class="stat">${wordCount} VO words</span>
     <span class="stat">${results.length} sentences</span>
     <span class="stat">${flagged.length} flagged</span>
     ${lastFetchMethod ? `<span class="stat method">via ${lastFetchMethod}</span>` : ''}
