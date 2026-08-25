@@ -987,6 +987,7 @@ window.runPipeline = async function () {
 
 function renderResults(title, vo, anchor, mosSlug, ticker, thinking, results) {
   const THRESHOLD = 0.72;
+  updateCurrentVoText(vo);
   document.getElementById('emptyState').style.display='none';
   document.getElementById('resultBlock').style.display='block';
   document.getElementById('paperFoot').style.display='block';
