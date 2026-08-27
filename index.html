@@ -89,6 +89,9 @@ input,select,textarea,button{font-family:inherit;font-size:16px}
 .topbar .spacer{flex:1}
 .clock{font-family:var(--mono);font-size:11px;color:var(--ink-soft);white-space:nowrap;display:none}
 @media (min-width:560px){.clock{display:block}}
+.top-banner{display:none;padding:10px 20px;border-bottom:1px solid transparent;font-family:var(--mono);font-size:11px;line-height:1.5}
+.top-banner.success{display:block;background:var(--mint-bg);border-bottom-color:var(--mint);color:var(--mint)}
+.top-banner.warning{display:block;background:var(--flag-amber-bg);border-bottom-color:var(--flag-amber);color:#80500B}
 
 /* ================= LAYOUT ================= */
 .shell{max-width:1440px;margin:0 auto}
@@ -243,6 +246,19 @@ details.diag[open] summary:before{content:'▾ '}
 .output-card.mos .output-label{color:#7654B8;background:#F5F1FC}
 .output-card.ticker .output-label{color:#A6630D;background:#FFF8E9}
 .output-copy{padding:13px 15px;font-family:var(--serif);font-size:17px;line-height:1.75;color:var(--paper-ink);white-space:pre-wrap}
+.editable-output[contenteditable="true"]{outline:none;cursor:text}
+.editable-output[contenteditable="true"]:focus{box-shadow:inset 0 0 0 2px rgba(31,182,201,.45);border-radius:3px}
+.edit-note{font-family:var(--mono);font-size:10px;color:var(--paper-dim);margin:10px 0 0}
+.translation-panel{margin-top:18px;padding-top:16px;border-top:1px dashed var(--paper-line)}
+.translation-panel h4{font-family:var(--display);font-size:15px;letter-spacing:.6px;text-transform:uppercase;color:var(--paper-ink);margin:0 0 8px}
+.translation-copy{padding:13px 15px;background:#F7FBFE;border:1px solid var(--paper-line);border-left:4px solid var(--wire-cyan);font-family:var(--serif);font-size:17px;line-height:1.75;color:var(--paper-ink);white-space:pre-wrap}
+.feedback{margin-top:18px;padding-top:16px;border-top:1px dashed var(--paper-line)}
+.feedback h4{font-family:var(--display);font-size:15px;letter-spacing:.6px;text-transform:uppercase;color:var(--paper-ink);margin:0 0 9px}
+.feedback-actions{display:flex;gap:8px;flex-wrap:wrap}
+.feedback-btn{padding:8px 11px;background:var(--paper-raised);border:1px solid var(--paper-line);color:var(--paper-ink);font-size:12px}
+.feedback-btn:hover{border-color:var(--wire-cyan)}
+.feedback-btn strong{font-family:var(--mono);color:var(--wire-cyan);margin-left:4px}
+.feedback-status{font-family:var(--mono);font-size:10px;color:var(--paper-dim);margin-top:8px;min-height:14px}
 
 .paper-body{padding:22px 22px 8px}
 .empty-state{
@@ -297,6 +313,7 @@ footer.foot{max-width:1440px;margin:0 auto;padding:8px 22px 34px;text-align:cent
   <div class="spacer"></div>
   <div class="clock" id="clockOut">—</div>
 </div>
+<div class="top-banner" id="topBanner" role="status" aria-live="polite"></div>
 
 <div class="shell">
 <div class="layout">
@@ -420,8 +437,22 @@ footer.foot{max-width:1440px;margin:0 auto;padding:8px 22px 34px;text-align:cent
 <div class="vo-actions">
 <button class="btn-read" id="readBtn" onclick="readVO()" type="button">🔊 Read VO</button>
 <button class="btn-record" id="recordBtn" onclick="recordVO()" type="button">⏺ Record VO</button>
+<button class="btn-ghost" id="translateBtn" onclick="translateToEnglish()" type="button">Translate to English</button>
 </div>
 <div class="status-line" id="recordStatus"></div>        </div>
+<div class="translation-panel" id="translationPanel" style="display:none">
+  <h4>Natural English translation</h4>
+  <div class="translation-copy" id="translationCopy"></div>
+</div>
+<div class="feedback" id="feedbackPanel" style="display:none">
+  <h4>Rate this gist</h4>
+  <div class="feedback-actions">
+    <button class="feedback-btn" onclick="rateGist('satisfactory')" type="button">Satisfactory <strong id="countSatisfactory">0</strong></button>
+    <button class="feedback-btn" onclick="rateGist('improvement')" type="button">Needs improvement <strong id="countImprovement">0</strong></button>
+    <button class="feedback-btn" onclick="rateGist('disaster')" type="button">Disaster <strong id="countDisaster">0</strong></button>
+  </div>
+  <div class="feedback-status" id="feedbackStatus"></div>
+</div>
       </div>
       <div class="paper-foot" id="paperFoot" style="display:none">
         <details class="reader">
@@ -446,6 +477,7 @@ import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers
 env.allowLocalModels = false;
 let embedder = null;
 let activeTab = 'url';
+let lastCompletionFinishReason = null;
 
 /* clock */
 function tickClock(){
@@ -733,6 +765,42 @@ MOS SLUG: <the concise visual slug>
 TICKER: <the short ticker line>`;
 
 const SYS_FETCH = `You are a web content extractor with browsing access. Visit the given URL and return ONLY the full body text of the main news article, verbatim, in its original language and script. Do not translate. Do not summarize. Do not include navigation menus, related-article lists, ads, comment counts, or social-share prompts. If the page cannot be reached or contains no article, respond with exactly: FETCH_FAILED`;
+const SYS_TRANSLATE = `You are an experienced Tamil news editor translating Tamil broadcast copy into meaningful, natural English. Preserve every verified fact, name, number, time reference, and level of certainty from the source. Do not translate word-for-word, preserve Tamil sentence order when it sounds unnatural, or add interpretation, context, opinion, or facts. Use clear newsroom English suitable for a television bulletin. Return only the translation as one connected paragraph.`;
+const SYS_ANCHOR = (anchorWords, anchorSeconds) => `You are a Tamil television news anchor. Write only one concise, natural VO Anchor paragraph from the supplied source. Use only facts stated in the source, keep names and numbers accurate, and do not add commentary. The paragraph must be approximately ${anchorWords} words for ${anchorSeconds} seconds at 105 words per minute, must be complete, and must end at a natural sentence boundary. Return only the anchor paragraph, with no label or explanation.`;
+
+const FEEDBACK_STORAGE = 'tj-wire-groq-feedback';
+function readFeedback(){
+  try {
+    const saved = JSON.parse(localStorage.getItem(FEEDBACK_STORAGE) || '{}');
+    return { satisfactory:Number(saved.satisfactory)||0, improvement:Number(saved.improvement)||0, disaster:Number(saved.disaster)||0 };
+  } catch (e) { return { satisfactory:0, improvement:0, disaster:0 }; }
+}
+function renderFeedback(){
+  const feedback = readFeedback();
+  Object.keys(feedback).forEach(key => { document.getElementById('count'+key[0].toUpperCase()+key.slice(1)).textContent = feedback[key].toLocaleString(); });
+}
+window.rateGist = function (rating){
+  const feedback = readFeedback();
+  if (!Object.prototype.hasOwnProperty.call(feedback, rating)) return;
+  feedback[rating] += 1;
+  localStorage.setItem(FEEDBACK_STORAGE, JSON.stringify(feedback));
+  renderFeedback();
+  document.getElementById('feedbackStatus').textContent = 'Saved locally in this browser.';
+};
+renderFeedback();
+
+function wordCount(text){ return (text || '').split(/\s+/).filter(Boolean).length; }
+function isCompleteSentence(text){ return /[.!?।]$/.test((text || '').trim()); }
+function showTopBanner(message, kind){
+  const banner = document.getElementById('topBanner');
+  banner.textContent = message;
+  banner.className = 'top-banner ' + kind;
+}
+function clearTopBanner(){
+  const banner = document.getElementById('topBanner');
+  banner.textContent = '';
+  banner.className = 'top-banner';
+}
 
 window.loadGroqModels = async function () {
   const key = document.getElementById('groqKey').value.trim();
@@ -799,6 +867,7 @@ async function callGroq(messages, model, temperature=0.2, maxTokens=2000) {
   });
   const data = await r.json();
   if (!r.ok) throw new Error(data?.error?.message || 'Groq API error');
+  lastCompletionFinishReason = data.choices?.[0]?.finish_reason || null;
   recordUsage(data.usage, model);
   return data.choices?.[0]?.message?.content?.trim() || '';
 }
@@ -842,6 +911,7 @@ async function fetchViaProxyChain(url, status) {
 
 /* ============ URL fetch orchestration (shared by preview button + pipeline) ============ */
 let lastFetchMethod = null;
+let sourceUrlForText = null;
 
 async function performFetch(url, status) {
   let text=null, via=null;
@@ -879,6 +949,7 @@ window.fetchUrl = async function () {
       return;
     }
     document.getElementById('sourceText').value = res.text;
+    sourceUrlForText = url;
     status.textContent = `✓ Extracted ${res.text.length.toLocaleString()} chars via ${res.via}.`;
     status.className='status-line ok';
     setStage('fetch','done');
@@ -899,8 +970,11 @@ window.runPipeline = async function () {
   const anchorSeconds = parseInt(document.getElementById('anchorSeconds').value,10) || 30;
   const anchorWpm = parseInt(document.getElementById('anchorWpm').value,10) || 105;
   const anchorWords = Math.max(5, Math.round(anchorSeconds * anchorWpm / 60));
+  const anchorMinWords = Math.max(1, anchorWords - 5);
+  const anchorMaxWords = anchorWords + 5;
 
   btn.disabled = true;
+  clearTopBanner();
   resetStages();
   document.getElementById('emptyState').style.display='none';
   document.getElementById('resultBlock').style.display='none';
@@ -925,25 +999,28 @@ window.runPipeline = async function () {
       ], model);
       setStage('fetch','done'); setStage('extract','done');
       document.getElementById('sourceText').value = sourceText;
+      sourceUrlForText = null;
 
     } else if (activeTab === 'text') {
       sourceText = document.getElementById('sourceTextDirect').value.trim();
       if (!sourceText) throw new Error('Paste source text first.');
       setStage('fetch','done'); setStage('extract','done');
       document.getElementById('sourceText').value = sourceText;
+      sourceUrlForText = null;
 
     } else {
-      // URL tab — fetch automatically if the extracted-text box is still empty.
+      // URL tab — refetch when the link changes; otherwise keep deliberate source edits.
       sourceText = document.getElementById('sourceText').value.trim();
-      if (!sourceText) {
-        const url = document.getElementById('articleUrl').value.trim();
-        if (!url) throw new Error('Enter an article URL first.');
+      const url = document.getElementById('articleUrl').value.trim();
+      if (!url) throw new Error('Enter an article URL first.');
+      if (!sourceText || sourceUrlForText !== url) {
         setStage('fetch','active');
-        status.textContent = 'Fetching article…';
+        status.textContent = sourceText ? 'New URL detected — fetching article…' : 'Fetching article…';
         const res = await performFetch(url, status);
         if (!res) throw new Error('Could not fetch/extract that page. Try the Text tab and paste it manually.');
         sourceText = res.text;
         document.getElementById('sourceText').value = sourceText;
+        sourceUrlForText = url;
       }
       setStage('fetch','done'); setStage('extract','done');
     }
@@ -952,18 +1029,35 @@ window.runPipeline = async function () {
     status.textContent = 'Drafting bulletin…';
     const model = document.getElementById('ghTextModel').value;
     if (!model) throw new Error('Load models and pick a writing model first.');
-    const targetTokens = Math.min(2000, Math.max(500, anchorWords * 6));
+    // This budget covers VO plus the three additional newsroom fields.
+    const targetTokens = Math.min(6000, Math.max(1800, anchorWords * 10));
     const rawGist = await callGroq([
       { role:'system', content: SYS_SUMMARY(anchorWords, anchorSeconds) },
       { role:'user', content: sourceText }
     ], model, 0.2, targetTokens);
     const { thinking, finalGist, truncated } = parseGroqResponse(rawGist);
 
+    if (lastCompletionFinishReason === 'length') {
+      setStage('draft','error');
+      throw new Error('The model stopped before completing the bulletin. Try again or choose a model with a larger output limit.');
+    }
     if (truncated || !finalGist) {
       setStage('draft','error');
       throw new Error('The model ran out of tokens while reasoning and never produced an answer. Try a different (non-reasoning) writing model, or raise the target word count.');
     }
-    const { title, vo, anchor, mosSlug, ticker } = parseNewsroomOutput(finalGist);
+    const { title, vo, anchor: parsedAnchor, mosSlug, ticker } = parseNewsroomOutput(finalGist);
+    let anchor = parsedAnchor;
+    if (!anchor || wordCount(anchor) < anchorMinWords || wordCount(anchor) > anchorMaxWords || !isCompleteSentence(anchor)) {
+      status.textContent = `Rewriting VO Anchor to ${anchorWords} words (allowed ${anchorMinWords}-${anchorMaxWords})…`;
+      anchor = await callGroq([
+        { role:'system', content:SYS_ANCHOR(anchorWords, anchorSeconds) },
+        { role:'user', content:sourceText }
+      ], model, 0.1, Math.max(300, anchorWords * 5));
+      if (!anchor || wordCount(anchor) < anchorMinWords || wordCount(anchor) > anchorMaxWords || !isCompleteSentence(anchor)) {
+        setStage('draft','error');
+        throw new Error(`The VO Anchor was incomplete or outside the ${anchorMinWords}-${anchorMaxWords} word range.`);
+      }
+    }
     setStage('draft','done');
 
     setStage('verify','active');
@@ -976,9 +1070,11 @@ window.runPipeline = async function () {
     renderResults(title, vo, anchor, mosSlug, ticker, thinking, results);
     status.textContent = '✓ Done.';
     status.className='status-line ok';
+    showTopBanner(`Gist ready. VO Anchor: ${wordCount(anchor)} words, complete and within the ${anchorMinWords}-${anchorMaxWords} word range.`, 'success');
   } catch (e) {
     status.textContent = 'Error: ' + (e.message||e);
     status.className='status-line err';
+    showTopBanner(`Warning: ${e.message || e}. A few extra seconds or another generation may be needed for a complete, meaningful bulletin.`, 'warning');
     document.getElementById('emptyState').style.display='block';
   } finally {
     btn.disabled=false;
@@ -987,7 +1083,6 @@ window.runPipeline = async function () {
 
 function renderResults(title, vo, anchor, mosSlug, ticker, thinking, results) {
   const THRESHOLD = 0.72;
-  updateCurrentVoText(vo);
   document.getElementById('emptyState').style.display='none';
   document.getElementById('resultBlock').style.display='block';
   document.getElementById('paperFoot').style.display='block';
@@ -1004,10 +1099,19 @@ function renderResults(title, vo, anchor, mosSlug, ticker, thinking, results) {
     return `<span class="${cls}" title="similarity: ${r.score.toFixed(2)}">${escapeHtml(r.sentence)}</span> `;
   }).join('');
   gistOut.innerHTML = `
-    <section class="output-card"><div class="output-label">VO</div><div class="output-copy gist">${voHtml}</div></section>
-    <section class="output-card anchor"><div class="output-label">VO ANCHOR</div><div class="output-copy">${escapeHtml(anchor || vo)}</div></section>
-    <section class="output-card mos"><div class="output-label">MOS SLUG</div><div class="output-copy">${escapeHtml(mosSlug || title || vo)}</div></section>
-    <section class="output-card ticker"><div class="output-label">TICKER</div><div class="output-copy">${escapeHtml(ticker || title || vo)}</div></section>`;
+    <section class="output-card"><div class="output-label">VO</div><div class="output-copy gist editable-output" data-field="vo" contenteditable="true" spellcheck="true">${escapeHtml(vo)}</div></section>
+    <section class="output-card anchor"><div class="output-label">VO ANCHOR</div><div class="output-copy editable-output" data-field="anchor" contenteditable="true" spellcheck="true">${escapeHtml(anchor || vo)}</div></section>
+    <section class="output-card mos"><div class="output-label">MOS SLUG</div><div class="output-copy editable-output" data-field="mosSlug" contenteditable="true" spellcheck="true">${escapeHtml(mosSlug || title || vo)}</div></section>
+    <section class="output-card ticker"><div class="output-label">TICKER</div><div class="output-copy editable-output" data-field="ticker" contenteditable="true" spellcheck="true">${escapeHtml(ticker || title || vo)}</div></section>`;
+  headlineEl.contentEditable = 'true';
+  headlineEl.classList.add('editable-output');
+  headlineEl.spellcheck = true;
+  headlineEl.title = 'Click to edit';
+  gistOut.querySelectorAll('.editable-output').forEach(el => el.title = 'Click to edit');
+  gistOut.oninput = () => updateCurrentVoText(gistOut.querySelector('[data-field="vo"]').innerText.trim());
+  updateCurrentVoText(vo);
+  document.getElementById('translationPanel').style.display = 'none';
+  document.getElementById('feedbackPanel').style.display = 'block';
 
   const flagged = results.filter(r=>r.score<THRESHOLD);
   document.getElementById('flagList').innerHTML = flagged.length
@@ -1022,16 +1126,41 @@ function renderResults(title, vo, anchor, mosSlug, ticker, thinking, results) {
 
   const avgScore = results.length ? results.reduce((a,c)=>a+c.score,0)/results.length : 0;
   const accuracyPercent = Math.min(100, Math.round(avgScore*100));
-  const wordCount = vo.split(/\s+/).filter(Boolean).length;
+  const voWordCount = wordCount(vo);
+  const anchorText = document.querySelector('[data-field="anchor"]')?.innerText.trim() || '';
+  const anchorWordCount = wordCount(anchorText);
 
   document.getElementById('statRow').innerHTML = `
     <span class="stat accuracy">Faithfulness ${accuracyPercent}%</span>
-    <span class="stat">${wordCount} VO words</span>
+    <span class="stat">${voWordCount} VO words</span>
+    <span class="stat">${anchorWordCount} anchor words / ${document.getElementById('anchorSeconds').value}s</span>
     <span class="stat">${results.length} sentences</span>
     <span class="stat">${flagged.length} flagged</span>
     ${lastFetchMethod ? `<span class="stat method">via ${lastFetchMethod}</span>` : ''}
   `;
 }
+
+window.translateToEnglish = async function () {
+  const button = document.getElementById('translateBtn');
+  const status = document.getElementById('recordStatus');
+  const vo = document.querySelector('[data-field="vo"]')?.innerText.trim();
+  const model = document.getElementById('ghTextModel').value;
+  if (!vo) { status.textContent = 'Generate a gist first.'; status.className = 'status-line err'; return; }
+  if (!model) { status.textContent = 'Load models and pick a writing model first.'; status.className = 'status-line err'; return; }
+  button.disabled = true;
+  status.textContent = 'Creating meaningful English translation…';
+  status.className = 'status-line';
+  try {
+    const translation = await callGroq([{ role:'system', content:SYS_TRANSLATE }, { role:'user', content:vo }], model, 0.2, 1200);
+    document.getElementById('translationCopy').textContent = translation;
+    document.getElementById('translationPanel').style.display = 'block';
+    status.textContent = '✓ English translation ready.';
+    status.className = 'status-line ok';
+  } catch (e) {
+    status.textContent = 'Translation error: ' + (e.message || e);
+    status.className = 'status-line err';
+  } finally { button.disabled = false; }
+};
 
 function escapeHtml(s){ return s.replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 /* ============ Read & Record ============ */
